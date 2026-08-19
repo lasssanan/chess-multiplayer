@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Room + Chess</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --line:#2a3140;
+    --txt:#e6edf3; --dim:#8b949e; --acc:#3fb950; --acc2:#58a6ff; --warn:#f0883e; --bad:#f85149;
+    --light:#e9d8b7; --dark:#7a5c3e; --sel:#f7d774; --dot:rgba(63,185,80,.55);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:radial-gradient(1200px 700px at 20% -10%,#1b2436,#0d1117 60%);
+    color:var(--txt); min-height:100vh; padding:14px;
+  }
+
+  /* ---------- LOBBY ---------- */
+  #lobby{
+    max-width:460px; margin:6vh auto; background:var(--panel);
+    border:1px solid var(--line); border-radius:18px; padding:28px 26px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  #lobby h1{font-size:26px; letter-spacing:.5px; margin-bottom:4px;}
+  #lobby p.sub{color:var(--dim); font-size:13px; margin-bottom:22px;}
+  label{display:block; font-size:12px; color:var(--dim); margin:14px 0 6px; text-transform:uppercase; letter-spacing:1px;}
+  input[type=text]{
+    width:100%; padding:12px 14px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:10px; color:var(--txt); font-size:15px; outline:none;
+  }
+  input[type=text]:focus{border-color:var(--acc2);}
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:12px 16px; border:1px solid var(--line); border-radius:10px;
+    background:var(--panel2); color:var(--txt); font-size:14px; font-weight:600;
+    cursor:pointer; transition:.15s; width:100%;
+  }
+  .btn:hover{background:#252d3d; border-color:#3d4757;}
+  .btn.primary{background:var(--acc); border-color:var(--acc); color:#06210d;}
+  .btn.primary:hover{filter:brightness(1.1);}
+  .btn.blue{background:var(--acc2); border-color:var(--acc2); color:#04203f;}
+  .btn.red{background:transparent; border-color:var(--bad); color:var(--bad);}
+  .btn.small{width:auto; padding:8px 12px; font-size:12.5px;}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+  .row{display:flex; gap:10px; margin-top:18px;}
+  .or{text-align:center; color:var(--dim); font-size:12px; margin:18px 0 4px;}
+  #lobbyErr{color:var(--bad); font-size:13px; margin-top:12px; min-height:18px;}
+  #lobbyInfo{color:var(--dim); font-size:12px; line-height:1.6;}
+  .modepill{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:1.2px; font-weight:700;
+    padding:4px 9px; border-radius:20px; border:1px solid var(--line); background:var(--panel2); color:var(--dim);
+  }
+  .modepill.online{color:var(--acc); border-color:rgba(63,185,80,.5);}
+  .modepill.local{color:var(--warn); border-color:rgba(240,136,62,.5);}
+  .modepill.solo{color:var(--acc2); border-color:rgba(88,166,255,.5);}
+
+  /* ---------- APP ---------- */
+  #app{display:none; max-width:1240px; margin:0 auto;}
+  .topbar{
+    display:flex; flex-wrap:wrap; align-items:center; gap:12px;
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:12px 16px; margin-bottom:14px;
+  }
+  .code{
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:22px; letter-spacing:4px;
+    color:var(--acc); font-weight:700;
+  }
+  .tag{font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:1.2px;}
+  .spacer{flex:1;}
+
+  .grid{display:grid; grid-template-columns:330px 1fr; gap:14px; align-items:start;}
+  @media(max-width:900px){ .grid{grid-template-columns:1fr;} }
+
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px;}
+  .card h3{font-size:12px; text-transform:uppercase; letter-spacing:1.4px; color:var(--dim); margin-bottom:10px;}
+
+  /* voice */
+  .mic-big{
+    width:100%; padding:14px; font-size:15px; font-weight:700; border-radius:12px; cursor:pointer;
+    border:1px solid var(--acc); background:var(--acc); color:#06210d; transition:.15s;
+  }
+  .mic-big.off{background:transparent; color:var(--acc);}
+  .mic-big.muted{background:var(--warn); border-color:var(--warn); color:#2a1500;}
+  .voice-note{font-size:11.5px; color:var(--dim); margin-top:8px; line-height:1.5;}
+  .mic-big:disabled{opacity:.45; cursor:not-allowed;}
+
+  .fieldlabel{font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:1.1px; margin:12px 0 5px;}
+  .microw{display:flex; gap:6px;}
+  .microw select{
+    flex:1; min-width:0; padding:8px 9px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:9px; color:var(--txt); font-size:12.5px; outline:none; cursor:pointer;
+  }
+  .microw select:focus{border-color:var(--acc2);}
+  .microw .btn{width:auto; padding:8px 10px;}
+  .micname{font-size:11px; color:var(--acc); margin-top:6px; word-break:break-word; line-height:1.45;}
+  .micname .muted-tag{color:var(--warn);}
+
+  /* input level meter */
+  .meter{
+    position:relative; height:16px; border-radius:8px; background:#0b0f16;
+    border:1px solid var(--line); overflow:hidden;
+  }
+  .meter i{
+    position:absolute; left:0; top:0; bottom:0; width:0%;
+    background:linear-gradient(90deg,#2ea043 0%,#3fb950 45%,#d29922 74%,#f85149 100%);
+    transition:width .05s linear;
+  }
+  .meter u{
+    position:absolute; top:0; bottom:0; width:2px; left:0; background:#fff; opacity:.85;
+    transition:left .12s ease-out; display:none;
+  }
+  .meter .meterTicks{
+    position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(90deg, transparent 0 9.9%, rgba(255,255,255,.10) 9.9% 10%);
+  }
+  .meterinfo{display:flex; justify-content:space-between; font-size:10.5px; color:var(--dim); margin-top:4px;
+             font-family:ui-monospace,Menlo,monospace;}
+  #meterState.live{color:var(--acc); font-weight:700;}
+  #meterState.quiet{color:var(--warn);}
+
+  .pcol{flex:1; min-width:0;}
+  .plvl{height:3px; border-radius:2px; background:#0b0f16; margin-top:4px; overflow:hidden;}
+  .plvl i{display:block; height:100%; width:0%; background:var(--acc); transition:width .07s linear;}
+
+  .plist{display:flex; flex-direction:column; gap:7px;}
+  .pitem{
+    display:flex; align-items:center; gap:9px; padding:8px 10px;
+    background:var(--panel2); border:1px solid var(--line); border-radius:10px; font-size:13.5px;
+  }
+  .pitem.speaking{border-color:var(--acc); box-shadow:0 0 0 2px rgba(63,185,80,.18);}
+  .dotm{width:9px; height:9px; border-radius:50%; background:#39414f; flex:none;}
+  .dotm.on{background:var(--acc);}
+  .pname{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .badge{font-size:10px; padding:2px 6px; border-radius:5px; background:#2d3546; color:var(--dim);}
+  .badge.w{background:#e9d8b7; color:#33280f;}
+  .badge.b{background:#3a2f22; color:#e9d8b7;}
+
+  /* chat */
+  #chatBox{
+    height:210px; overflow-y:auto; background:var(--panel2); border:1px solid var(--line);
+    border-radius:10px; padding:10px; font-size:13px; display:flex; flex-direction:column; gap:6px;
+  }
+  .msg span.who{color:var(--acc2); font-weight:600;}
+  .msg.sys{color:var(--dim); font-style:italic; font-size:12px;}
+  .chatrow{display:flex; gap:8px; margin-top:9px;}
+  .chatrow input{flex:1;}
+
+  /* ---------------- chess ---------------- */
+  .chess-wrap{
+    /* board ka size — har jagah exact square rehta hai */
+    --bsize: min(86vw, 70vh, 580px);
+    display:flex; flex-direction:column; align-items:center; gap:10px; width:100%;
+    container-type:inline-size;
+  }
+  @supports (width: 1cqi){
+    .chess-wrap{ --bsize: min(100cqi, 70vh, 580px); }
+  }
+  .seatbar{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:100%;}
+
+  .capbar{
+    width:var(--bsize); max-width:100%; height:24px; display:flex; align-items:center; gap:1px;
+    font-size:18px; line-height:1; color:#aab4c0; overflow:hidden; white-space:nowrap;
+  }
+  .capbar .adv{margin-left:7px; font-size:12px; font-weight:700; color:var(--acc); font-family:ui-monospace,monospace;}
+
+  /* board = perfect square grid */
+  #board{
+    width:var(--bsize); aspect-ratio:1 / 1; max-width:100%;
+    display:grid;
+    grid-template-columns:repeat(8, 1fr);
+    grid-template-rows:repeat(8, 1fr);
+    border:10px solid #2c3441; border-radius:8px; overflow:hidden;
+    box-shadow:0 18px 46px rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.4);
+    touch-action:manipulation; background:#769656;
+  }
+  .sq{
+    position:relative; width:100%; aspect-ratio:1 / 1; min-width:0; min-height:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:calc(var(--bsize) / 8 * 0.80);
+    line-height:1; cursor:pointer; user-select:none; -webkit-user-select:none;
+  }
+  .sq.l{background:#eeeed2;} .sq.d{background:#769656;}
+
+  /* overlays (base rang ko dhakte nahi, sirf tint karte hain) */
+  .sq.last::after{content:''; position:absolute; inset:0; background:rgba(255,213,0,.36); pointer-events:none;}
+  .sq.sel::before{content:''; position:absolute; inset:0; background:rgba(255,213,0,.48);
+                  box-shadow:inset 0 0 0 3px rgba(255,193,7,.95); pointer-events:none; z-index:1;}
+  .sq.chk::after{content:''; position:absolute; inset:0; pointer-events:none;
+                 background:radial-gradient(circle, rgba(255,60,45,.95) 0%, rgba(255,60,45,.75) 42%, rgba(255,60,45,0) 72%);}
+
+  .sq .hint{
+    position:absolute; width:30%; height:30%; border-radius:50%;
+    background:rgba(20,30,20,.30); pointer-events:none; z-index:1;
+  }
+  .sq .hint.cap{
+    width:100%; height:100%; border-radius:0; background:transparent;
+    box-shadow:inset 0 0 0 6px rgba(20,30,20,.28);
+  }
+
+  .sq .pc{
+    position:relative; z-index:2; cursor:grab;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,.45));
+  }
+  .sq .pc:active{cursor:grabbing;}
+  .sq .pc.wp{color:#ffffff; -webkit-text-stroke:calc(var(--bsize)/8*0.032) #2f2f2f;
+             text-shadow:0 1px 1px rgba(0,0,0,.35);}
+  .sq .pc.bp{color:#2b2b2b; -webkit-text-stroke:calc(var(--bsize)/8*0.026) #101010;
+             text-shadow:0 1px 1px rgba(255,255,255,.18);}
+  .sq.dragging .pc{opacity:.35;}
+  .sq.dragover::before{content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+                       box-shadow:inset 0 0 0 4px rgba(255,255,255,.85);}
+
+  .coord{position:absolute; font-size:calc(var(--bsize)/8*0.19); font-weight:700; opacity:.62; z-index:3; pointer-events:none;}
+  .coord.f{bottom:2px; right:4px;}
+  .coord.r{top:2px; left:4px;}
+  .sq.l .coord{color:#5a7a3e;} .sq.d .coord{color:#eeeed2;}
+
+  .statusline{
+    text-align:center; font-size:14px; padding:9px 14px; background:var(--panel2);
+    border:1px solid var(--line); border-radius:10px; width:var(--bsize); max-width:100%; min-height:44px;
+  }
+  .statusline b{color:var(--acc);}
+  .statusline.over{border-color:var(--acc); background:#12331c;}
+  .moves{
+    max-height:92px; overflow-y:auto; width:var(--bsize); max-width:100%; font-family:ui-monospace,Menlo,monospace;
+    font-size:12.5px; color:#b6c0cc; background:var(--panel2); border:1px solid var(--line);
+    border-radius:10px; padding:8px 10px; line-height:1.75;
+  }
+  .moves .no{color:var(--dim);}
+  .moves .mv{display:inline-block; min-width:52px;}
+  .moves .mv.cur{color:var(--acc); font-weight:700;}
+
+  /* promotion modal */
+  #promo{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.65);
+    align-items:center; justify-content:center; z-index:50;
+  }
+  #promo .box{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; text-align:center;}
+  #promo .opts{display:flex; gap:10px; margin-top:14px;}
+  #promo .opt{width:64px; height:64px; font-size:40px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:10px; cursor:pointer; color:#fff;}
+  #promo .opt:hover{border-color:var(--acc);}
+
+  #toast{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    background:#20262f; border:1px solid var(--line); padding:10px 18px; border-radius:10px;
+    font-size:13px; display:none; z-index:60;
+  }
+  #audios{display:none;}
+</style>
+</head>
+<body>
+
+<!-- ============ LOBBY ============ -->
+<div id="lobby">
+  <h1>🎙️ Voice Room <span style="color:var(--dim);font-weight:400">+</span> ♟️ Chess</h1>
+  <p class="sub">Mic se baat karo · 2 player chess khelo</p>
+
+  <label>Tumhara naam</label>
+  <input type="text" id="nameInput" placeholder="Player" maxlength="16" autocomplete="off">
+
+  <div class="row">
+    <button class="btn primary" id="createBtn">➕ Room Banao</button>
+  </div>
+
+  <div class="or">— ya —</div>
+
+  <label>Room code</label>
+  <input type="text" id="codeInput" placeholder="ABC123" maxlength="6" autocomplete="off" style="text-transform:uppercase;letter-spacing:3px;">
+  <div class="row">
+    <button class="btn blue" id="joinBtn">🔗 Join Room</button>
+  </div>
+
+  <div class="or">— ya —</div>
+  <div class="row" style="margin-top:0">
+    <button class="btn" id="soloBtn">♟️ Pass &amp; Play (ek hi device)</button>
+  </div>
+
+  <div id="lobbyErr"></div>
+  <div id="lobbyInfo">Server chalu ho to alag-alag device connect ho jaate hain. Server na mile to app khud <b>Local mode</b> me chala jata hai — usi browser ke doosre tab me code daal ke join karo.</div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <div class="topbar">
+    <div>
+      <div class="tag">Room Code</div>
+      <div class="code" id="roomCode">------</div>
+    </div>
+    <button class="btn small" id="copyBtn">📋 Copy</button>
+    <div class="spacer"></div>
+    <div class="modepill" id="modePill">online</div>
+    <div class="tag" id="whoami"></div>
+    <button class="btn small red" id="leaveBtn">Leave</button>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT -->
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      <div class="card">
+        <h3>Voice Chat</h3>
+        <button class="mic-big off" id="micBtn">🎤 Mic Connect</button>
+
+        <div id="micPanel" style="display:none">
+          <div class="fieldlabel">Mic device</div>
+          <div class="microw">
+            <select id="micSelect"></select>
+            <button class="btn small" id="micRefresh" title="Dobara scan karo">⟳</button>
+          </div>
+          <div class="micname" id="micName">—</div>
+
+          <div class="fieldlabel">Input level</div>
+          <div class="meter" id="meter">
+            <i id="meterFill"></i>
+            <u id="meterPeak"></u>
+            <b class="meterTicks"></b>
+          </div>
+          <div class="meterinfo">
+            <span id="meterState">🎤 khamosh</span>
+            <span id="meterDb">-∞ dB</span>
+          </div>
+
+          <div class="row" style="margin-top:10px;">
+            <button class="btn small" id="muteBtn" style="flex:1">🔇 Mute</button>
+            <button class="btn small red" id="hangBtn" style="flex:1">Disconnect</button>
+          </div>
+        </div>
+        <div class="voice-note" id="voiceNote">Mic connect karo, phir room ke sab log tumhe sun sakenge.</div>
+      </div>
+
+      <div class="card">
+        <h3>Players (<span id="pcount">0</span>)</h3>
+        <div class="plist" id="players"></div>
+      </div>
+
+      <div class="card">
+        <h3>Text Chat</h3>
+        <div id="chatBox"></div>
+        <div class="chatrow">
+          <input type="text" id="chatInput" placeholder="Message..." maxlength="400">
+          <button class="btn small blue" id="sendBtn">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="card">
+      <h3>Chess — 2 Player</h3>
+      <div class="chess-wrap">
+        <div class="seatbar">
+          <button class="btn small" id="seatW">♔ White lo</button>
+          <button class="btn small" id="seatB">♚ Black lo</button>
+          <button class="btn small" id="seatLeave">Seat chhodo</button>
+          <button class="btn small" id="flipBtn">🔄 Flip</button>
+          <button class="btn small" id="resetBtn">↺ New Game</button>
+          <button class="btn small red" id="resignBtn">🏳️ Resign</button>
+          <button class="btn small" id="sndBtn">🔊</button>
+        </div>
+        <div class="statusline" id="status">Seat lo aur khelna shuru karo</div>
+        <div class="capbar" id="capTop"></div>
+        <div id="board"></div>
+        <div class="capbar" id="capBot"></div>
+        <div class="moves" id="moveList">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="promo"><div class="box">
+  <div style="font-size:14px;color:var(--dim)">Pawn promote karo</div>
+  <div class="opts" id="promoOpts"></div>
+</div></div>
+
+<div id="toast"></div>
+<div id="audios"></div>
+
+<script>
+/* =================================================================
+   1. CHESS ENGINE  (full rules: castling, en-passant, promotion,
+      check / checkmate / stalemate)
+   ================================================================= */
+const START = () => [
+  ['r','n','b','q','k','b','n','r'],
+  ['p','p','p','p','p','p','p','p'],
+  [null,null,null,null,null,null,null,null],
+  [null,null,null,null,null,null,null,null],
+  [null,null,null,null,null,null,null,null],
+  [null,null,null,null,null,null,null,null],
+  ['P','P','P','P','P','P','P','P'],
+  ['R','N','B','Q','K','B','N','R']
+];
+const SOLID = {k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
+const GLYPH = new Proxy({}, { get:(_,p)=> SOLID[String(p).toLowerCase()] || '' });
+const VALUE = {p:1, n:3, b:3, r:5, q:9, k:0};
+const isW = p => !!p && p === p.toUpperCase();
+const isB = p => !!p && p === p.toLowerCase();
+const sideOf = p => isW(p) ? 'w' : 'b';
+const inside = (r,c) => r>=0 && r<8 && c>=0 && c<8;
+const sqName = (r,c) => 'abcdefgh'[c] + (8-r);
+const clone = b => b.map(r => r.slice());
+
+function findKing(b, side){
+  const k = side === 'w' ? 'K' : 'k';
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) if(b[r][c]===k) return [r,c];
+  return null;
+}
+
+/* raw attacks — used for check detection (no castling) */
+function attacks(b, side){
+  const out = [];
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p = b[r][c];
+    if(!p || sideOf(p)!==side) continue;
+    const t = p.toLowerCase();
+    if(t==='p'){
+      const dr = side==='w' ? -1 : 1;
+      [[dr,-1],[dr,1]].forEach(([a,d])=>{ if(inside(r+a,c+d)) out.push([r+a,c+d]); });
+    } else if(t==='n'){
+      [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([a,d])=>{
+        if(inside(r+a,c+d)) out.push([r+a,c+d]);
+      });
+    } else if(t==='k'){
+      for(let a=-1;a<=1;a++) for(let d=-1;d<=1;d++)
+        if((a||d) && inside(r+a,c+d)) out.push([r+a,c+d]);
+    } else {
+      const dirs = t==='r' ? [[1,0],[-1,0],[0,1],[0,-1]]
+                 : t==='b' ? [[1,1],[1,-1],[-1,1],[-1,-1]]
+                 : [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+      dirs.forEach(([a,d])=>{
+        let rr=r+a, cc=c+d;
+        while(inside(rr,cc)){
+          out.push([rr,cc]);
+          if(b[rr][cc]) break;
+          rr+=a; cc+=d;
+        }
+      });
+    }
+  }
+  return out;
+}
+
+function isAttacked(b, r, c, bySide){
+  return attacks(b, bySide).some(([x,y]) => x===r && y===c);
+}
+function inCheck(b, side){
+  const k = findKing(b, side);
+  return k ? isAttacked(b, k[0], k[1], side==='w'?'b':'w') : false;
+}
+
+/* pseudo-legal moves for one square */
+function movesFrom(b, r, c, rights, ep){
+  const p = b[r][c];
+  if(!p) return [];
+  const side = sideOf(p), t = p.toLowerCase(), res = [];
+  const own = x => x && sideOf(x)===side;
+
+  if(t==='p'){
+    const dr = side==='w' ? -1 : 1;
+    const start = side==='w' ? 6 : 1;
+    if(inside(r+dr,c) && !b[r+dr][c]){
+      res.push([r+dr,c]);
+      if(r===start && !b[r+2*dr][c]) res.push([r+2*dr,c]);
+    }
+    [[dr,-1],[dr,1]].forEach(([a,d])=>{
+      const rr=r+a, cc=c+d;
+      if(!inside(rr,cc)) return;
+      if(b[rr][cc] && !own(b[rr][cc])) res.push([rr,cc]);
+      else if(ep && ep[0]===rr && ep[1]===cc) res.push([rr,cc]);
+    });
+  } else if(t==='n'){
+    [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([a,d])=>{
+      const rr=r+a, cc=c+d;
+      if(inside(rr,cc) && !own(b[rr][cc])) res.push([rr,cc]);
+    });
+  } else if(t==='k'){
+    for(let a=-1;a<=1;a++) for(let d=-1;d<=1;d++){
+      const rr=r+a, cc=c+d;
+      if((a||d) && inside(rr,cc) && !own(b[rr][cc])) res.push([rr,cc]);
+    }
+    // castling
+    const home = side==='w' ? 7 : 0;
+    const opp  = side==='w' ? 'b' : 'w';
+    if(r===home && c===4 && !inCheck(b, side)){
+      const kSide = side==='w' ? rights.wK : rights.bK;
+      const qSide = side==='w' ? rights.wQ : rights.bQ;
+      if(kSide && !b[home][5] && !b[home][6]
+         && !isAttacked(b,home,5,opp) && !isAttacked(b,home,6,opp)) res.push([home,6]);
+      if(qSide && !b[home][3] && !b[home][2] && !b[home][1]
+         && !isAttacked(b,home,3,opp) && !isAttacked(b,home,2,opp)) res.push([home,2]);
+    }
+  } else {
+    const dirs = t==='r' ? [[1,0],[-1,0],[0,1],[0,-1]]
+               : t==='b' ? [[1,1],[1,-1],[-1,1],[-1,-1]]
+               : [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+    dirs.forEach(([a,d])=>{
+      let rr=r+a, cc=c+d;
+      while(inside(rr,cc)){
+        if(own(b[rr][cc])) break;
+        res.push([rr,cc]);
+        if(b[rr][cc]) break;
+        rr+=a; cc+=d;
+      }
+    });
+  }
+  return res;
+}
+
+/* apply move → new board */
+function applyMove(b, from, to, promo, ep){
+  const nb = clone(b);
+  const [fr,fc] = from, [tr,tc] = to;
+  const p = nb[fr][fc];
+  const t = p.toLowerCase();
+  nb[tr][tc] = p;
+  nb[fr][fc] = null;
+
+  // en passant capture
+  if(t==='p' && ep && tr===ep[0] && tc===ep[1] && fc!==tc){
+    nb[fr][tc] = null;
+  }
+  // promotion
+  if(t==='p' && (tr===0 || tr===7)){
+    const q = promo || 'q';
+    nb[tr][tc] = isW(p) ? q.toUpperCase() : q.toLowerCase();
+  }
+  // castling rook hop
+  if(t==='k' && Math.abs(tc-fc)===2){
+    if(tc===6){ nb[fr][5]=nb[fr][7]; nb[fr][7]=null; }
+    else      { nb[fr][3]=nb[fr][0]; nb[fr][0]=null; }
+  }
+  return nb;
+}
+
+function legalMoves(b, r, c, rights, ep){
+  const p = b[r][c];
+  if(!p) return [];
+  const side = sideOf(p);
+  return movesFrom(b,r,c,rights,ep).filter(to => {
+    const nb = applyMove(b,[r,c],to,'q',ep);
+    return !inCheck(nb, side);
+  });
+}
+
+function allLegal(b, side, rights, ep){
+  const out = [];
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=b[r][c];
+    if(p && sideOf(p)===side)
+      legalMoves(b,r,c,rights,ep).forEach(to => out.push([[r,c],to]));
+  }
+  return out;
+}
+
+/* rights + ep rebuilt from move history (so late joiners stay in sync) */
+function posKey(board, turn, rights, ep){
+  return board.map(r => r.map(x => x || '.').join('')).join('/')
+    + ' ' + turn
+    + ' ' + (rights.wK?'K':'') + (rights.wQ?'Q':'') + (rights.bK?'k':'') + (rights.bQ?'q':'')
+    + ' ' + (ep ? ep.join(',') : '-');
+}
+
+function deriveState(moves){
+  const rights = {wK:true, wQ:true, bK:true, bQ:true};
+  let ep = null, board = START(), turn = 'w', half = 0;
+  const reps = {};
+  reps[posKey(board, turn, rights, ep)] = 1;
+
+  moves.forEach(m => {
+    const from = m.from, to = m.to;
+    const p = board[from[0]][from[1]];
+    const captured = board[to[0]][to[1]];
+    const isPawn = p && p.toLowerCase() === 'p';
+    const isEp = isPawn && ep && to[0] === ep[0] && to[1] === ep[1] && from[1] !== to[1];
+
+    board = applyMove(board, from, to, m.promo, ep);
+
+    half = (isPawn || captured || isEp) ? 0 : half + 1;
+
+    const fn = sqName(from[0], from[1]), tn = sqName(to[0], to[1]);
+    if(fn === 'e1'){ rights.wK = false; rights.wQ = false; }
+    if(fn === 'e8'){ rights.bK = false; rights.bQ = false; }
+    if(fn === 'h1' || tn === 'h1') rights.wK = false;
+    if(fn === 'a1' || tn === 'a1') rights.wQ = false;
+    if(fn === 'h8' || tn === 'h8') rights.bK = false;
+    if(fn === 'a8' || tn === 'a8') rights.bQ = false;
+
+    ep = (isPawn && Math.abs(to[0] - from[0]) === 2) ? [(from[0] + to[0]) / 2, from[1]] : null;
+    turn = turn === 'w' ? 'b' : 'w';
+
+    const k = posKey(board, turn, rights, ep);
+    reps[k] = (reps[k] || 0) + 1;
+  });
+
+  const key = posKey(board, turn, rights, ep);
+  return {board, rights, ep, turn, half, reps, key, repCount: reps[key] || 1};
+}
+
+function toSAN(b, from, to, promo, rights, ep, nextBoard, nextSide){
+  const p = b[from[0]][from[1]];
+  const t = p.toLowerCase();
+  const side = sideOf(p);
+  const cap = !!b[to[0]][to[1]] || (t === 'p' && ep && to[0] === ep[0] && to[1] === ep[1] && from[1] !== to[1]);
+  let san;
+
+  if(t === 'k' && Math.abs(to[1] - from[1]) === 2){
+    san = to[1] === 6 ? 'O-O' : 'O-O-O';
+  } else if(t === 'p'){
+    san = (cap ? 'abcdefgh'[from[1]] + 'x' : '') + sqName(to[0], to[1]);
+    if(to[0] === 0 || to[0] === 7) san += '=' + (promo || 'q').toUpperCase();
+  } else {
+    // disambiguation: koi aur same piece bhi wahi ja sakta hai?
+    let sameFile = false, sameRank = false, other = false;
+    for(let r = 0; r < 8; r++) for(let c = 0; c < 8; c++){
+      if(r === from[0] && c === from[1]) continue;
+      if(b[r][c] !== p) continue;
+      if(legalMoves(b, r, c, rights, ep).some(m => m[0] === to[0] && m[1] === to[1])){
+        other = true;
+        if(c === from[1]) sameFile = true;
+        if(r === from[0]) sameRank = true;
+      }
+    }
+    let dis = '';
+    if(other) dis = !sameFile ? 'abcdefgh'[from[1]] : (!sameRank ? String(8 - from[0]) : sqName(from[0], from[1]));
+    san = t.toUpperCase() + dis + (cap ? 'x' : '') + sqName(to[0], to[1]);
+  }
+
+  if(inCheck(nextBoard, nextSide)){
+    const rights2 = JSON.parse(JSON.stringify(rights));
+    const noMoves = allLegal(nextBoard, nextSide, rights2, null).length === 0;
+    san += noMoves ? '#' : '+';
+  }
+  return san;
+}
+
+function deriveStateAfter(board, side, rights, ep){
+  return { noMoves: allLegal(board, side, rights, ep).length === 0 };
+}
+
+/* =================================================================
+   2. NETWORK  —  3 modes
+      online : server (WebSocket)      → alag alag device
+      local  : bina server             → same browser ke 2 tabs
+      solo   : pass & play             → ek hi device, dono side
+   ================================================================= */
+let MODE = 'online';
+let ws = null, myId = rid(), myName = 'Player', roomCode = null;
+let players = [], chess = null, flipped = false, flippedManual = false;
+
+const $ = id => document.getElementById(id);
+function rid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+const toast = (t) => {
+  const el = $('toast'); el.textContent = t; el.style.display='block';
+  clearTimeout(el._t); el._t = setTimeout(()=>el.style.display='none', 2800);
+};
+function genCode(){
+  const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c='';
+  for(let i=0;i<6;i++) c += A[Math.floor(Math.random()*A.length)];
+  return c;
+}
+function emptyChess(){ return {white:null, black:null, moves:[], turn:'w', result:null, reason:null}; }
+
+/* ---------- safe localStorage ---------- */
+const LS = (()=>{
+  try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t');
+       return { get:k=>localStorage.getItem(k), set:(k,v)=>localStorage.setItem(k,v), del:k=>localStorage.removeItem(k), ok:true };
+  }catch(e){ const m={}; return { get:k=>m[k]||null, set:(k,v)=>m[k]=v, del:k=>delete m[k], ok:false }; }
+})();
+const roomKey = c => 'vcroom:' + c;
+function lsRead(c){ try{ return JSON.parse(LS.get(roomKey(c)) || 'null'); }catch(e){ return null; } }
+function lsWrite(st){ LS.set(roomKey(st.code), JSON.stringify(st)); }
+
+/* ---------- cross-tab channel (BroadcastChannel + storage fallback) ---------- */
+let chan = null;
+const seenMsg = new Set();
+function makeChan(code){
+  const key = 'vcmsg:' + code;
+  let bc = null;
+  try{ bc = new BroadcastChannel('vcroom-' + code); bc.onmessage = e => chanRecv(e.data); }catch(e){}
+  window.addEventListener('storage', e => {
+    if(e.key === key && e.newValue){ try{ chanRecv(JSON.parse(e.newValue)); }catch(_){} }
+  });
+  return {
+    post(m){
+      m._mid = rid(); m._from = myId;
+      if(bc) try{ bc.postMessage(m); }catch(e){}
+      try{ LS.set(key, JSON.stringify(m)); }catch(e){}
+    },
+    close(){ if(bc) try{ bc.close(); }catch(e){} }
+  };
+}
+function chanRecv(m){
+  if(!m || !m._mid || seenMsg.has(m._mid)) return;
+  seenMsg.add(m._mid);
+  if(seenMsg.size > 400) seenMsg.clear();
+  if(m._from === myId) return;
+  if(m.to && m.to !== myId) return;
+  handleLocalMsg(m);
+}
+function chanPost(m){ if(chan) chan.post(m); }
+
+/* ---------- state accessors (local/solo) ---------- */
+let memState = null;
+function getState(){
+  if(MODE === 'solo') return memState;
+  return lsRead(roomCode) || memState;
+}
+function saveState(st){
+  memState = st;
+  if(MODE === 'local') lsWrite(st);
+}
+function mutate(fn){
+  const st = getState();
+  if(!st) return;
+  fn(st);
+  saveState(st);
+  if(MODE === 'local') chanPost({type:'sync', state:st});
+  applyState(st);
+}
+function applyState(st){
+  players = st.players.slice();
+  chess = pubChess(st);
+  renderPlayers(); renderBoard();
+}
+function pubChess(st){
+  const nm = id => { const p = st.players.find(x=>x.id===id); return p ? p.name : null; };
+  return { white:st.chess.white, black:st.chess.black, moves:st.chess.moves,
+           turn:st.chess.turn, result:st.chess.result, reason:st.chess.reason,
+           whiteName:nm(st.chess.white), blackName:nm(st.chess.black) };
+}
+
+/* ---------- unified send ---------- */
+function sendWS(o){
+  if(MODE === 'online'){ if(ws && ws.readyState === 1) ws.send(JSON.stringify(o)); return; }
+  localSend(o);
+}
+
+function localSend(o){
+  switch(o.type){
+    case 'chat': {
+      const st = getState(); if(!st) return;
+      const me = st.players.find(p=>p.id===myId);
+      const m = {type:'chat', playerId:myId, playerName: me?me.name:myName,
+                 message:String(o.message||'').slice(0,400), timestamp:Date.now()};
+      mutate(s => { s.chat.push(m); if(s.chat.length>60) s.chat.shift(); });
+      addChat(m); chanPost(m);
+      break;
+    }
+    case 'mic_state':
+      mutate(s => { const p = s.players.find(x=>x.id===myId); if(p) p.micOn = !!o.micOn; });
+      break;
+
+    case 'chess_seat': mutate(s => seatOp(s, myId, o.side)); break;
+
+    case 'chess_move':
+      mutate(s => {
+        const c = s.chess;
+        c.moves.push({from:o.from, to:o.to, promo:o.promo||null, san:o.san||''});
+        c.turn = o.turn;
+        if(o.result){ c.result = o.result; c.reason = o.reason||null; }
+      });
+      break;
+
+    case 'chess_reset':
+      mutate(s => { const w=s.chess.white, b=s.chess.black; s.chess = emptyChess(); s.chess.white=w; s.chess.black=b; });
+      sysLocal('Nayi baazi shuru!');
+      break;
+
+    case 'chess_resign': {
+      const st = getState(); if(!st || st.chess.result) return;
+      const seat = st.chess.white===myId ? 'w' : st.chess.black===myId ? 'b' : null;
+      if(!seat) return;
+      mutate(s => { s.chess.result = seat==='w' ? '0-1' : '1-0';
+                    s.chess.reason = (seat==='w'?'White':'Black') + ' ne resign kiya'; });
+      break;
+    }
+
+    case 'leave_room': localLeave(); break;
+
+    case 'rtc_offer': case 'rtc_answer': case 'rtc_ice':
+      chanPost(o); break;
+  }
+}
+function seatOfId(s,id){ return s.chess.white===id ? 'w' : s.chess.black===id ? 'b' : null; }
+function seatOp(s, id, side){
+  const c = s.chess;
+  if(side === 'leave'){ if(c.white===id) c.white=null; if(c.black===id) c.black=null; return; }
+  if(side === 'w'){ if(c.white && c.white!==id) return toast('White seat busy hai'); if(c.black===id) c.black=null; c.white=id; }
+  if(side === 'b'){ if(c.black && c.black!==id) return toast('Black seat busy hai'); if(c.white===id) c.white=null; c.black=id; }
+}
+function sysLocal(text){
+  const m = {type:'chat', playerId:'__system__', playerName:'SYSTEM', message:text, timestamp:Date.now(), isSystem:true};
+  const st = getState();
+  if(st){ st.chat.push(m); if(st.chat.length>60) st.chat.shift(); saveState(st); }
+  addChat(m);
+  if(MODE === 'local') chanPost(m);
+}
+
+/* ---------- incoming cross-tab messages ---------- */
+function handleLocalMsg(m){
+  switch(m.type){
+    case 'sync':
+      memState = m.state;
+      if(MODE === 'local') lsWrite(m.state);
+      applyState(m.state);
+      break;
+
+    case 'chat': addChat(m); break;
+
+    case 'hello': {                       // naya tab aaya
+      const st = getState();
+      if(st){
+        if(!st.players.find(p => p.id === m.player.id)) st.players.push(m.player);
+        saveState(st); applyState(st);
+        chanPost({type:'sync', state:st});
+      }
+      if(voiceOn) makePeer(m.player.id, true);
+      break;
+    }
+
+    case 'bye': {
+      const st = getState();
+      if(st){
+        st.players = st.players.filter(p => p.id !== m.id);
+        if(st.chess.white === m.id) st.chess.white = null;
+        if(st.chess.black === m.id) st.chess.black = null;
+        saveState(st); applyState(st);
+      }
+      closePeer(m.id);
+      break;
+    }
+
+    case 'rtc_offer':  onOffer({...m, from:m._from}); break;
+    case 'rtc_answer': onAnswer({...m, from:m._from}); break;
+    case 'rtc_ice':    onIce({...m, from:m._from}); break;
+  }
+}
+
+/* ---------- entering a room ---------- */
+function enterRoom(st){
+  roomCode = st.code;
+  $('lobby').style.display = 'none';
+  $('app').style.display = 'block';
+  $('roomCode').textContent = st.code;
+  $('whoami').textContent = myName;
+  const pill = $('modePill');
+  pill.className = 'modepill ' + MODE;
+  pill.textContent = MODE === 'online' ? '🌐 online' : MODE === 'local' ? '💻 local (2 tabs)' : '♟️ pass & play';
+  if(MODE === 'solo'){
+    $('micBtn').disabled = true;
+    $('voiceNote').textContent = 'Pass & Play mode — voice ke liye Online/Local room banao.';
+  }
+  $('chatBox').innerHTML = '';
+  (st.chat || []).forEach(addChat);
+  applyState(st);
+}
+
+/* ---------- ONLINE ---------- */
+function startOnline(payload, fallback){
+  if(!location.host || location.protocol === 'file:') return fallback('server nahi mila');
+  let settled = false;
+  try{
+    const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    ws = new WebSocket(proto + location.host);
+  }catch(e){ return fallback('server nahi mila'); }
+
+  const timer = setTimeout(() => { if(!settled){ settled = true; try{ws.close();}catch(_){} fallback('server ne jawab nahi diya'); } }, 1800);
+
+  ws.onopen = () => { settled = true; clearTimeout(timer); MODE = 'online'; ws.send(JSON.stringify(payload)); };
+  ws.onerror = () => { if(!settled){ settled = true; clearTimeout(timer); fallback('server nahi mila'); } };
+  ws.onclose = () => { if(!settled){ settled = true; clearTimeout(timer); fallback('server nahi mila'); }
+                       else if(roomCode && MODE==='online') toast('⚠ Server se connection toot gaya'); };
+  ws.onmessage = e => onServerMsg(JSON.parse(e.data));
+}
+
+function onServerMsg(m){
+  switch(m.type){
+    case 'welcome': myId = m.id; break;
+    case 'room_joined':
+      myId = m.you;
+      enterRoom({ code:m.code, players:m.players, chat:m.chatHistory||[], chess:emptyChess() });
+      players = m.players; chess = m.chess;
+      renderPlayers(); renderBoard();
+      break;
+    case 'player_joined':
+      players = m.players; renderPlayers();
+      if(voiceOn) makePeer(m.player.id, true);
+      break;
+    case 'player_left':
+      players = m.players; if(m.chess) chess = m.chess;
+      closePeer(m.playerId); renderPlayers(); renderBoard();
+      break;
+    case 'chat': addChat(m); break;
+    case 'mic_state': { const p = players.find(x=>x.id===m.playerId); if(p) p.micOn = m.micOn; renderPlayers(); break; }
+    case 'chess_state': chess = m.chess; renderBoard(); break;
+    case 'chess_move':  chess = m.chess; renderBoard(); break;
+    case 'rtc_offer':  onOffer(m); break;
+    case 'rtc_answer': onAnswer(m); break;
+    case 'rtc_ice':    onIce(m); break;
+    case 'error': toast('⚠ ' + m.message); break;
+  }
+}
+
+/* ---------- LOCAL (no server) ---------- */
+function localCreate(){
+  MODE = 'local';
+  let code; do { code = genCode(); } while(lsRead(code));
+  const st = { code, players:[{id:myId, name:myName, micOn:false}], chat:[], chess:emptyChess() };
+  saveState(st); lsWrite(st);
+  chan = makeChan(code);
+  enterRoom(st);
+  sysLocal(myName + ' ne room banaya (local mode)');
+}
+function localJoin(code){
+  const st = lsRead(code);
+  if(!st){ return false; }
+  MODE = 'local';
+  if(!st.players.find(p=>p.id===myId)) st.players.push({id:myId, name:myName, micOn:false});
+  saveState(st); lsWrite(st);
+  chan = makeChan(code);
+  enterRoom(st);
+  chanPost({type:'hello', player:{id:myId, name:myName, micOn:false}});
+  sysLocal(myName + ' room me aaya');
+  return true;
+}
+function localLeave(){
+  if(MODE !== 'local') return;
+  const st = getState();
+  if(st){
+    st.players = st.players.filter(p => p.id !== myId);
+    if(st.chess.white === myId) st.chess.white = null;
+    if(st.chess.black === myId) st.chess.black = null;
+    if(st.players.length === 0) LS.del(roomKey(st.code)); else lsWrite(st);
+    chanPost({type:'sync', state:st});
+  }
+  chanPost({type:'bye', id:myId});
+}
+function soloStart(){
+  MODE = 'solo';
+  memState = { code:'SOLO', players:[{id:myId, name:myName, micOn:false}], chat:[], chess:emptyChess() };
+  memState.chess.white = myId; memState.chess.black = myId;
+  enterRoom(memState);
+  sysLocal('Pass & Play — dono side tum khelo. Flip button se board ghumao.');
+}
+window.addEventListener('beforeunload', () => { if(MODE==='local') localLeave(); });
+
+/* ---------- lobby buttons ---------- */
+function grabName(){
+  myName = ($('nameInput').value || 'Player').trim().slice(0,16) || 'Player';
+  return myName;
+}
+$('createBtn').onclick = () => {
+  grabName();
+  $('lobbyErr').textContent = '';
+  $('lobbyInfo').textContent = 'Server dhoondh rahe hain...';
+  startOnline({type:'create_room', playerName:myName}, (why) => {
+    $('lobbyInfo').innerHTML = '⚠ ' + why + ' — <b>Local mode</b> me room bana diya (same browser ke doosre tab me code daal ke join karo).';
+    localCreate();
+  });
+};
+$('joinBtn').onclick = () => {
+  const code = $('codeInput').value.trim().toUpperCase();
+  if(code.length !== 6){ $('lobbyErr').textContent = '6 character ka code daalo'; return; }
+  grabName();
+  $('lobbyErr').textContent = '';
+  $('lobbyInfo').textContent = 'Join kar rahe hain...';
+  startOnline({type:'join_room', code, playerName:myName}, () => {
+    if(!localJoin(code)){
+      $('lobbyInfo').textContent = '';
+      $('lobbyErr').textContent = 'Room nahi mila. Server band hai — local mode me sirf isi browser ke room join hote hain.';
+    }
+  });
+};
+$('soloBtn').onclick = () => { grabName(); soloStart(); };
+$('codeInput').addEventListener('keydown', e => { if(e.key==='Enter') $('joinBtn').click(); });
+$('copyBtn').onclick = () => {
+  try{ navigator.clipboard.writeText(roomCode).then(()=>toast('Code copy ho gaya'), ()=>toast(roomCode)); }
+  catch(e){ toast(roomCode); }
+};
+$('leaveBtn').onclick = () => { hangup(); sendWS({type:'leave_room'}); setTimeout(()=>location.reload(), 60); };
+
+/* ---------- players ---------- */
+function renderPlayers(){
+  $('pcount').textContent = players.length;
+  $('players').innerHTML = players.map(p => {
+    const seat = chess && chess.white===p.id && chess.black===p.id ? '<span class="badge w">Both</span>'
+               : chess && chess.white===p.id ? '<span class="badge w">White</span>'
+               : chess && chess.black===p.id ? '<span class="badge b">Black</span>' : '';
+    return `<div class="pitem" id="pi-${p.id}">
+      <div class="dotm ${p.micOn?'on':''}"></div>
+      <div class="pcol">
+        <div class="pname">${esc(p.name)}${p.id===myId?' <span class="badge">you</span>':''}</div>
+        <div class="plvl"><i id="lv-${p.id}"></i></div>
+      </div>
+      ${seat}
+    </div>`;
+  }).join('');
+}
+
+/* ---------- chat ---------- */
+function addChat(m){
+  const box = $('chatBox');
+  const d = document.createElement('div');
+  const t = new Date(m.timestamp||Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  if(m.isSystem){ d.className='msg sys'; d.textContent = '• ' + m.message; }
+  else { d.className='msg'; d.innerHTML = `<span class="who">${esc(m.playerName)}</span> <span style="color:var(--dim);font-size:11px">${t}</span><br>${esc(m.message)}`; }
+  box.appendChild(d);
+  box.scrollTop = box.scrollHeight;
+}
+$('sendBtn').onclick = sendChat;
+$('chatInput').addEventListener('keydown', e => { if(e.key==='Enter') sendChat(); });
+function sendChat(){
+  const v = $('chatInput').value.trim();
+  if(!v) return;
+  sendWS({type:'chat', message:v});
+  $('chatInput').value = '';
+}
+
+/* =================================================================
+   3. VOICE  (WebRTC mesh + device picker + live level meters)
+   ================================================================= */
+const RTC_CFG = { iceServers:[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'}
+]};
+let localStream = null, voiceOn = false, muted = false;
+let curMicId = null, curMicLabel = '', micList = [];
+const peers = new Map();          // peerId -> {pc, making, ignore, polite}
+const meters = new Map();         // playerId -> {an, buf, val}
+let audioCtx = null, rafId = null;
+
+const MIC_PREF_KEY = 'vc_mic_device';
+const hasMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+$('micBtn').onclick = () => { if(!voiceOn) startVoice(); };
+$('muteBtn').onclick = toggleMute;
+$('hangBtn').onclick = hangup;
+$('micRefresh').onclick = () => listMics(true);
+$('micSelect').onchange = e => switchMic(e.target.value);
+
+if(hasMedia && navigator.mediaDevices.addEventListener){
+  navigator.mediaDevices.addEventListener('devicechange', () => {
+    listMics(false).then(() => { if(voiceOn) toast('🎧 Audio device list badli'); });
+  });
+}
+
+/* ---------- device list ---------- */
+async function listMics(announce){
+  if(!hasMedia) return [];
+  let devs = [];
+  try{ devs = await navigator.mediaDevices.enumerateDevices(); }
+  catch(e){ return []; }
+
+  micList = devs.filter(d => d.kind === 'audioinput');
+  const sel = $('micSelect');
+  const keep = curMicId || sel.value || LS.get(MIC_PREF_KEY) || '';
+  sel.innerHTML = '';
+
+  if(!micList.length){
+    const o = document.createElement('option');
+    o.value = ''; o.textContent = 'Koi mic nahi mila';
+    sel.appendChild(o); sel.disabled = true;
+    return micList;
+  }
+  sel.disabled = false;
+
+  micList.forEach((d, i) => {
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    let label = d.label || `Microphone ${i + 1}`;
+    if(d.deviceId === 'default') label = '⭐ ' + label.replace(/^Default\s*-\s*/i, '') + ' (phone/PC default)';
+    else if(d.deviceId === 'communications') label = '☎ ' + label.replace(/^Communications\s*-\s*/i, '');
+    o.textContent = label;
+    sel.appendChild(o);
+  });
+
+  const exists = micList.some(d => d.deviceId === keep);
+  sel.value = exists ? keep : (micList.find(d => d.deviceId === 'default') || micList[0]).deviceId;
+  if(announce) toast(`${micList.length} mic mile`);
+  return micList;
+}
+
+function labelFor(id){
+  const d = micList.find(x => x.deviceId === id);
+  if(!d) return 'Default microphone';
+  return d.label || 'Microphone';
+}
+
+function showMicName(){
+  const isDefault = curMicId === 'default' || !curMicId;
+  $('micName').innerHTML = voiceOn
+    ? `🎙️ <b>${esc(curMicLabel || 'Default microphone')}</b>${isDefault ? ' <span style="color:var(--dim)">(system default)</span>' : ''}`
+      + (muted ? ' <span class="muted-tag">— MUTED</span>' : '')
+    : '—';
+}
+
+/* ---------- start / switch / stop ---------- */
+async function getMicStream(deviceId){
+  const audio = { echoCancellation:true, noiseSuppression:true, autoGainControl:true };
+  if(deviceId && deviceId !== 'default') audio.deviceId = { exact: deviceId };
+  return navigator.mediaDevices.getUserMedia({ audio, video:false });
+}
+
+function micError(e){
+  const n = e && e.name || '';
+  if(n === 'NotAllowedError' || n === 'SecurityError')
+    return 'Mic permission block hai — address bar ke 🔒 icon se Microphone → Allow karo.';
+  if(n === 'NotFoundError' || n === 'OverconstrainedError')
+    return 'Koi mic nahi mila — device connect karke ⟳ dabao.';
+  if(n === 'NotReadableError')
+    return 'Mic kisi aur app (Zoom/Meet) me busy hai — usse band karo.';
+  if(!window.isSecureContext)
+    return 'HTTPS ya localhost zaroori hai — file:// pe mic nahi chalta.';
+  return 'Mic start nahi hua: ' + (e && e.message || n);
+}
+
+async function startVoice(){
+  if(!hasMedia){
+    $('voiceNote').innerHTML = '<span style="color:var(--bad)">Is browser me mic support nahi (ya page HTTPS pe nahi hai).</span>';
+    return;
+  }
+  $('micBtn').disabled = true;
+  $('micBtn').textContent = '⏳ Mic khol rahe hain...';
+  try{
+    const pref = LS.get(MIC_PREF_KEY) || undefined;
+    localStream = await getMicStream(pref);
+  }catch(e1){
+    try{ localStream = await getMicStream(undefined); }   // fallback: system default
+    catch(e2){
+      $('micBtn').disabled = false;
+      $('micBtn').textContent = '🎤 Mic Connect';
+      toast('⚠ Mic nahi khula');
+      $('voiceNote').innerHTML = '<span style="color:var(--bad)">' + esc(micError(e2)) + '</span>';
+      return;
+    }
+  }
+
+  voiceOn = true; muted = false;
+  $('micBtn').disabled = false;
+
+  await listMics(false);                                   // ab labels mil jayenge (permission ke baad)
+  const track = localStream.getAudioTracks()[0];
+  const settings = track.getSettings ? track.getSettings() : {};
+  curMicId = settings.deviceId || $('micSelect').value || 'default';
+  curMicLabel = track.label || labelFor(curMicId);
+  if(micList.some(d => d.deviceId === curMicId)) $('micSelect').value = curMicId;
+  LS.set(MIC_PREF_KEY, curMicId);
+
+  $('micBtn').textContent = '🟢 Mic Connected';
+  $('micBtn').classList.remove('off');
+  $('micPanel').style.display = 'block';
+  $('voiceNote').textContent = 'Live ho — room ke sab log tumhe sun rahe hain.';
+  showMicName();
+
+  sendWS({type:'mic_state', micOn:true});
+  players.filter(p => p.id !== myId).forEach(p => makePeer(p.id, true));
+
+  attachMeter(myId, localStream);
+  startMeterLoop();
+}
+
+async function switchMic(deviceId){
+  if(!deviceId) return;
+  LS.set(MIC_PREF_KEY, deviceId);
+  if(!voiceOn){ curMicId = deviceId; return; }
+
+  let ns;
+  try{ ns = await getMicStream(deviceId); }
+  catch(e){ toast('⚠ ' + micError(e)); await listMics(false); return; }
+
+  const newTrack = ns.getAudioTracks()[0];
+  newTrack.enabled = !muted;
+
+  peers.forEach(({pc}) => {
+    const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+    if(sender) sender.replaceTrack(newTrack).catch(()=>{});
+  });
+
+  if(localStream) localStream.getTracks().forEach(t => t.stop());
+  localStream = ns;
+
+  const st = newTrack.getSettings ? newTrack.getSettings() : {};
+  curMicId = st.deviceId || deviceId;
+  curMicLabel = newTrack.label || labelFor(curMicId);
+  showMicName();
+  attachMeter(myId, localStream);
+  toast('🎙️ Mic badal diya: ' + curMicLabel.slice(0, 28));
+}
+
+function toggleMute(){
+  if(!localStream) return;
+  muted = !muted;
+  localStream.getAudioTracks().forEach(t => t.enabled = !muted);
+  $('muteBtn').textContent = muted ? '🎤 Unmute' : '🔇 Mute';
+  $('micBtn').textContent = muted ? '🟠 Muted' : '🟢 Mic Connected';
+  $('micBtn').classList.toggle('muted', muted);
+  showMicName();
+  sendWS({type:'mic_state', micOn: !muted});
+}
+
+function hangup(){
+  voiceOn = false; muted = false;
+  if(localStream){ localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  Array.from(peers.keys()).forEach(closePeer);
+  meters.clear();
+  if(rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  setMeter(0);
+  $('micBtn').textContent = '🎤 Mic Connect';
+  $('micBtn').classList.add('off'); $('micBtn').classList.remove('muted');
+  $('micPanel').style.display = 'none';
+  $('voiceNote').textContent = 'Mic connect karo, phir room ke sab log tumhe sun sakenge.';
+  sendWS({type:'mic_state', micOn:false});
+}
+
+/* ---------- level meters ---------- */
+function ctx(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ return null; }
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+  return audioCtx;
+}
+
+function attachMeter(id, stream){
+  const c = ctx();
+  if(!c || !stream) return;
+  try{
+    const src = c.createMediaStreamSource(stream);
+    const an = c.createAnalyser();
+    an.fftSize = 1024; an.smoothingTimeConstant = 0.25;
+    src.connect(an);
+    meters.set(id, { an, buf: new Uint8Array(an.fftSize), val: 0, peak: 0, peakT: 0 });
+  }catch(e){}
+  startMeterLoop();
+}
+
+function rmsOf(m){
+  m.an.getByteTimeDomainData(m.buf);
+  let sum = 0;
+  for(let i = 0; i < m.buf.length; i++){ const v = (m.buf[i] - 128) / 128; sum += v * v; }
+  return Math.sqrt(sum / m.buf.length);            // 0..1
+}
+
+function setMeter(pct, db){
+  $('meterFill').style.width = Math.max(0, Math.min(100, pct)) + '%';
+  const st = $('meterState'), dbEl = $('meterDb');
+  if(!dbEl) return;
+  dbEl.textContent = (db === undefined || db < -60) ? '-∞ dB' : db.toFixed(0) + ' dB';
+  if(!voiceOn){ st.textContent = '🎤 band'; st.className = ''; return; }
+  if(muted){ st.textContent = '🔇 muted'; st.className = 'quiet'; return; }
+  if(pct > 6){ st.textContent = '🗣️ bol rahe ho'; st.className = 'live'; }
+  else { st.textContent = '🎤 khamosh'; st.className = 'quiet'; }
+}
+
+function startMeterLoop(){
+  if(rafId) return;
+  const loop = () => {
+    rafId = requestAnimationFrame(loop);
+    meters.forEach((m, id) => {
+      let rms = 0;
+      try{ rms = rmsOf(m); }catch(e){}
+      if(id === myId && muted) rms = 0;
+      const pct = Math.min(100, Math.pow(rms, 0.55) * 190);   // aankh ko theek lagne wala scale
+      m.val = m.val * 0.6 + pct * 0.4;
+
+      if(id === myId){
+        const db = rms > 0.0004 ? 20 * Math.log10(rms) : -99;
+        setMeter(m.val, db);
+        const now = performance.now();
+        if(m.val > m.peak || now - m.peakT > 900){ m.peak = m.val; m.peakT = now; }
+        const pk = $('meterPeak');
+        if(pk){ pk.style.display = m.peak > 2 ? 'block' : 'none'; pk.style.left = Math.min(99, m.peak) + '%'; }
+      }
+      const bar = document.getElementById('lv-' + id);
+      if(bar) bar.style.width = Math.min(100, m.val) + '%';
+      const row = document.getElementById('pi-' + id);
+      if(row) row.classList.toggle('speaking', m.val > 6);
+    });
+    if(!meters.size){ cancelAnimationFrame(rafId); rafId = null; }
+  };
+  rafId = requestAnimationFrame(loop);
+}
+
+/* ---------- WebRTC ---------- */
+function makePeer(peerId, initiate){
+  if(peers.has(peerId)){
+    if(initiate && localStream) addLocalTracks(peers.get(peerId).pc);
+    return peers.get(peerId);
+  }
+  const pc = new RTCPeerConnection(RTC_CFG);
+  const st = { pc, making:false, ignore:false, polite: myId > peerId };
+  peers.set(peerId, st);
+
+  if(localStream) addLocalTracks(pc);
+  else pc.addTransceiver('audio', {direction:'recvonly'});
+
+  pc.onicecandidate = e => { if(e.candidate) sendWS({type:'rtc_ice', to:peerId, candidate:e.candidate}); };
+  pc.ontrack = e => { attachAudio(peerId, e.streams[0]); attachMeter(peerId, e.streams[0]); };
+  pc.onnegotiationneeded = async () => {
+    try{
+      st.making = true;
+      await pc.setLocalDescription();
+      sendWS({type:'rtc_offer', to:peerId, sdp:pc.localDescription});
+    }catch(err){ console.warn(err); }
+    finally{ st.making = false; }
+  };
+  pc.onconnectionstatechange = () => {
+    if(['failed','closed'].includes(pc.connectionState)) closePeer(peerId);
+  };
+  return st;
+}
+
+function addLocalTracks(pc){
+  if(pc.getSenders().some(s => s.track && s.track.kind === 'audio')) return;
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+}
+
+async function onOffer(m){
+  const st = makePeer(m.from, false);
+  const { pc } = st;
+  const collision = st.making || pc.signalingState !== 'stable';
+  st.ignore = !st.polite && collision;
+  if(st.ignore) return;
+  await pc.setRemoteDescription(m.sdp);
+  if(localStream) addLocalTracks(pc);
+  await pc.setLocalDescription();
+  sendWS({type:'rtc_answer', to:m.from, sdp:pc.localDescription});
+}
+async function onAnswer(m){
+  const st = peers.get(m.from);
+  if(!st) return;
+  try{ await st.pc.setRemoteDescription(m.sdp); }catch(e){}
+}
+async function onIce(m){
+  const st = peers.get(m.from);
+  if(!st) return;
+  try{ await st.pc.addIceCandidate(m.candidate); }catch(e){ if(!st.ignore) console.warn(e); }
+}
+
+function attachAudio(peerId, stream){
+  let el = document.getElementById('a-' + peerId);
+  if(!el){
+    el = document.createElement('audio');
+    el.id = 'a-' + peerId; el.autoplay = true; el.playsInline = true;
+    $('audios').appendChild(el);
+  }
+  el.srcObject = stream;
+  el.play().catch(() => toast('🔊 Sound on karne ke liye page pe tap karo'));
+}
+
+function closePeer(peerId){
+  const st = peers.get(peerId);
+  if(st){ try{ st.pc.close(); }catch(e){} peers.delete(peerId); }
+  meters.delete(peerId);
+  const el = document.getElementById('a-' + peerId);
+  if(el) el.remove();
+}
+
+/* permission pehle se granted ho to labels turant dikha do */
+(async () => {
+  if(!hasMedia) return;
+  try{
+    if(navigator.permissions && navigator.permissions.query){
+      const p = await navigator.permissions.query({name:'microphone'});
+      if(p.state === 'granted') await listMics(false);
+      p.onchange = () => { if(p.state === 'granted') listMics(false); };
+    }
+  }catch(e){}
+  await listMics(false);
+})();
+
+/* =================================================================
+   4. CHESS UI
+   ================================================================= */
+let sel = null, selMoves = [], local = null, dragFrom = null;
+let lastSeenPly = 0;
+
+$('seatW').onclick = () => sendWS({type:'chess_seat', side:'w'});
+$('seatB').onclick = () => sendWS({type:'chess_seat', side:'b'});
+$('seatLeave').onclick = () => sendWS({type:'chess_seat', side:'leave'});
+$('flipBtn').onclick = () => { flippedManual = true; flipped = !flipped; renderBoard(); };
+$('resetBtn').onclick = () => { lastSeenPly = 0; sendWS({type:'chess_reset'}); };
+$('resignBtn').onclick = () => sendWS({type:'chess_resign'});
+
+/* ---------- sound ---------- */
+let sndOn = true, actx = null;
+$('sndBtn').onclick = () => { sndOn = !sndOn; $('sndBtn').textContent = sndOn ? '🔊' : '🔇'; };
+function tone(freq, dur, type, vol, delay){
+  if(!sndOn) return;
+  try{
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const t0 = actx.currentTime + (delay || 0);
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.13, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }catch(e){}
+}
+function sfx(kind){
+  if(kind === 'move')    tone(330, 0.07, 'triangle', 0.10);
+  if(kind === 'capture'){ tone(180, 0.10, 'square', 0.09); tone(120, 0.09, 'sine', 0.10, 0.03); }
+  if(kind === 'check')  { tone(660, 0.09, 'sine', 0.12); tone(880, 0.10, 'sine', 0.12, 0.09); }
+  if(kind === 'castle') { tone(300, 0.07, 'triangle', 0.10); tone(400, 0.07, 'triangle', 0.10, 0.07); }
+  if(kind === 'end')    { tone(520, 0.14, 'sine', 0.12); tone(392, 0.16, 'sine', 0.12, 0.14); tone(262, 0.28, 'sine', 0.12, 0.30); }
+}
+
+/* ---------- seats ---------- */
+function mySeats(){
+  if(!chess) return [];
+  const s = [];
+  if(chess.white === myId) s.push('w');
+  if(chess.black === myId) s.push('b');
+  return s;
+}
+function canMove(side){ return mySeats().includes(side); }
+function autoFlip(){
+  if(flippedManual) return;
+  const s = mySeats();
+  if(s.length === 1) flipped = (s[0] === 'b');
+}
+
+/* ---------- render ---------- */
+function renderBoard(){
+  if(!chess) return;
+  local = deriveState(chess.moves || []);
+  autoFlip();
+
+  const b = local.board;
+  const boardEl = $('board');
+  const ml = chess.moves || [];
+  const lastMv = ml.length ? ml[ml.length - 1] : null;
+  const kingSq = inCheck(b, local.turn) ? findKing(b, local.turn) : null;
+
+  const rows = flipped ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
+  const cols = flipped ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
+
+  const frag = document.createDocumentFragment();
+  rows.forEach((r, ri) => cols.forEach((c, ci) => {
+    const d = document.createElement('div');
+    d.className = 'sq ' + ((r + c) % 2 === 0 ? 'l' : 'd');
+    d.dataset.r = r; d.dataset.c = c;
+
+    if(lastMv && ((lastMv.from[0]===r && lastMv.from[1]===c) || (lastMv.to[0]===r && lastMv.to[1]===c)))
+      d.classList.add('last');
+    if(sel && sel[0]===r && sel[1]===c) d.classList.add('sel');
+    if(kingSq && kingSq[0]===r && kingSq[1]===c) d.classList.add('chk');
+
+    const p = b[r][c];
+    if(p){
+      const sp = document.createElement('span');
+      sp.className = 'pc ' + (isW(p) ? 'wp' : 'bp');
+      sp.textContent = GLYPH[p];
+      if(canMove(local.turn) && sideOf(p) === local.turn && !chess.result){
+        sp.draggable = true;
+        sp.addEventListener('dragstart', ev => onDragStart(ev, r, c));
+        sp.addEventListener('dragend', () => { d.classList.remove('dragging');
+          document.querySelectorAll('.sq.dragover').forEach(x => x.classList.remove('dragover')); });
+      }
+      d.appendChild(sp);
+    }
+
+    if(selMoves.some(m => m[0]===r && m[1]===c)){
+      const h = document.createElement('div');
+      h.className = 'hint' + (b[r][c] ? ' cap' : '');
+      d.appendChild(h);
+    }
+
+    /* coordinates — bottom row = files, left column = ranks */
+    if(ri === 7){
+      const f = document.createElement('div');
+      f.className = 'coord f'; f.textContent = 'abcdefgh'[c];
+      d.appendChild(f);
+    }
+    if(ci === 0){
+      const rk = document.createElement('div');
+      rk.className = 'coord r'; rk.textContent = String(8 - r);
+      d.appendChild(rk);
+    }
+
+    d.addEventListener('click', () => onSquare(r, c));
+    d.addEventListener('dragover', ev => { if(dragFrom){ ev.preventDefault(); d.classList.add('dragover'); } });
+    d.addEventListener('dragleave', () => d.classList.remove('dragover'));
+    d.addEventListener('drop', ev => { ev.preventDefault(); d.classList.remove('dragover'); onDrop(r, c); });
+
+    frag.appendChild(d);
+  }));
+
+  boardEl.innerHTML = '';
+  boardEl.appendChild(frag);
+
+  renderCaptures(b);
+  renderStatus();
+  renderMoves(ml);
+
+  $('seatW').disabled = !!(chess.white && chess.white !== myId);
+  $('seatB').disabled = !!(chess.black && chess.black !== myId);
+  $('resignBtn').disabled = mySeats().length === 0 || !!chess.result;
+
+  /* naya move aaya → sound */
+  if(ml.length > lastSeenPly){
+    const san = (lastMv && lastMv.san) || '';
+    if(chess.result) sfx('end');
+    else if(san.includes('#') ) sfx('end');
+    else if(san.includes('+')) sfx('check');
+    else if(san.startsWith('O-O')) sfx('castle');
+    else if(san.includes('x')) sfx('capture');
+    else sfx('move');
+  }
+  lastSeenPly = ml.length;
+}
+
+function renderCaptures(b){
+  const startCount = {P:8,N:2,B:2,R:2,Q:1,p:8,n:2,b:2,r:2,q:1};
+  const live = {};
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){ const p=b[r][c]; if(p) live[p]=(live[p]||0)+1; }
+
+  let wLost = '', bLost = '', wPts = 0, bPts = 0;
+  Object.keys(startCount).forEach(k => {
+    const gone = startCount[k] - (live[k] || 0);
+    if(gone <= 0) return;
+    const v = VALUE[k.toLowerCase()] * gone;
+    if(k === k.toUpperCase()){ wLost += GLYPH[k].repeat(gone); wPts += v; }
+    else { bLost += GLYPH[k].repeat(gone); bPts += v; }
+  });
+
+  const diff = bPts - wPts;              // + hone par White aage hai
+  const topIsWhite = flipped;            // flipped => White upar
+  // har bar us player ke pakde hue mohre dikhata hai (yaani saamne wale ke khoye hue)
+  const top = { lost: topIsWhite ? bLost : wLost,
+                adv:  topIsWhite ? (diff > 0 ? '+' + diff : '') : (diff < 0 ? '+' + (-diff) : '') };
+  const bot = { lost: topIsWhite ? wLost : bLost,
+                adv:  topIsWhite ? (diff < 0 ? '+' + (-diff) : '') : (diff > 0 ? '+' + diff : '') };
+
+  $('capTop').innerHTML = esc(top.lost) + (top.adv ? `<span class="adv">${top.adv}</span>` : '');
+  $('capBot').innerHTML = esc(bot.lost) + (bot.adv ? `<span class="adv">${bot.adv}</span>` : '');
+}
+
+function renderMoves(ml){
+  const el = $('moveList');
+  if(!ml.length){ el.textContent = '—'; return; }
+  let html = '';
+  for(let i = 0; i < ml.length; i += 2){
+    const n = i / 2 + 1;
+    const w = ml[i] ? ml[i].san || mvTxt(ml[i]) : '';
+    const bl = ml[i+1] ? ml[i+1].san || mvTxt(ml[i+1]) : '';
+    html += `<span class="no">${n}.</span> <span class="mv${i===ml.length-1?' cur':''}">${esc(w)}</span> `
+          + (bl ? `<span class="mv${i+1===ml.length-1?' cur':''}">${esc(bl)}</span> ` : '');
+  }
+  el.innerHTML = html;
+  el.scrollTop = el.scrollHeight;
+}
+function mvTxt(m){ return sqName(m.from[0], m.from[1]) + sqName(m.to[0], m.to[1]); }
+
+function renderStatus(){
+  const s = $('status');
+  s.classList.toggle('over', !!chess.result);
+  const wn = chess.whiteName || '—', bn = chess.blackName || '—';
+
+  if(chess.result){
+    const txt = chess.result === '1-0' ? '🏆 White jeeta' : chess.result === '0-1' ? '🏆 Black jeeta' : '🤝 Draw';
+    s.innerHTML = `<b>${txt}</b> <span style="color:var(--dim)">(${esc(chess.result)})</span>`
+      + `<br><span style="color:var(--dim);font-size:12px">${esc(chess.reason || '')} · New Game dabao</span>`;
+    return;
+  }
+  if(!chess.white || !chess.black){
+    s.innerHTML = `Dono seats bharna zaroori hai`
+      + `<br><span style="color:var(--dim);font-size:12px">♔ ${esc(wn)} · ♚ ${esc(bn)}</span>`;
+    return;
+  }
+  const turnName = local.turn === 'w' ? wn : bn;
+  const check = inCheck(local.board, local.turn) ? ' <span style="color:var(--bad);font-weight:700">CHECK!</span>' : '';
+  const you = canMove(local.turn) ? ' — <b>tumhari baari</b>' : '';
+  const half = local.half >= 80 ? ` <span style="color:var(--warn);font-size:11px">50-move: ${Math.floor(local.half/2)}</span>` : '';
+  s.innerHTML = `${local.turn === 'w' ? '♔ White' : '♚ Black'} — ${esc(turnName)}${you}${check}${half}`
+    + `<br><span style="color:var(--dim);font-size:12px">♔ ${esc(wn)} vs ♚ ${esc(bn)} · move ${Math.floor((chess.moves||[]).length/2)+1}</span>`;
+}
+
+/* ---------- input ---------- */
+function onDragStart(ev, r, c){
+  if(!chess || chess.result) return;
+  dragFrom = [r, c];
+  sel = [r, c];
+  selMoves = legalMoves(local.board, r, c, local.rights, local.ep);
+  try{ ev.dataTransfer.setData('text/plain', r + ',' + c); ev.dataTransfer.effectAllowed = 'move'; }catch(e){}
+  const sq = ev.target.parentElement;
+  setTimeout(() => { sq.classList.add('dragging'); renderHints(); }, 0);
+}
+function renderHints(){
+  document.querySelectorAll('#board .sq').forEach(d => {
+    const r = +d.dataset.r, c = +d.dataset.c;
+    d.querySelectorAll('.hint').forEach(h => h.remove());
+    if(selMoves.some(m => m[0] === r && m[1] === c)){
+      const h = document.createElement('div');
+      h.className = 'hint' + (local.board[r][c] ? ' cap' : '');
+      d.appendChild(h);
+    }
+    d.classList.toggle('sel', !!sel && sel[0] === r && sel[1] === c);
+  });
+}
+function onDrop(r, c){
+  if(!dragFrom) return;
+  const from = dragFrom; dragFrom = null;
+  if(selMoves.some(m => m[0] === r && m[1] === c)) doMove(from, [r, c]);
+  else { sel = null; selMoves = []; renderBoard(); }
+}
+
+function onSquare(r, c){
+  if(!chess || chess.result) return;
+  const b = local.board;
+
+  if(sel && selMoves.some(m => m[0] === r && m[1] === c)) return doMove(sel, [r, c]);
+  if(sel && sel[0] === r && sel[1] === c){ sel = null; selMoves = []; return renderBoard(); }
+
+  const p = b[r][c];
+  if(p && sideOf(p) === local.turn && canMove(local.turn)){
+    sel = [r, c];
+    selMoves = legalMoves(b, r, c, local.rights, local.ep);
+    if(!selMoves.length) toast('Is piece ki koi legal chaal nahi');
+  } else {
+    if(p && mySeats().length === 0) toast('Pehle White ya Black seat lo');
+    else if(p && sideOf(p) !== local.turn) toast('Abhi ' + (local.turn === 'w' ? 'White' : 'Black') + ' ki baari hai');
+    else if(p) toast('Ye side tumhari nahi');
+    sel = null; selMoves = [];
+  }
+  renderBoard();
+}
+
+/* ---------- move ---------- */
+function doMove(from, to){
+  const p = local.board[from[0]][from[1]];
+  const isPromo = p.toLowerCase() === 'p' && (to[0] === 0 || to[0] === 7);
+  if(isPromo) askPromo(sideOf(p), promo => finishMove(from, to, promo));
+  else finishMove(from, to, null);
+}
+
+function askPromo(side, cb){
+  const wrap = $('promo'); wrap.style.display = 'flex';
+  const opts = $('promoOpts'); opts.innerHTML = '';
+  ['q','r','b','n'].forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.style.color = side === 'w' ? '#fff' : '#111';
+    btn.style.webkitTextStroke = side === 'w' ? '1.5px #333' : '1px #000';
+    btn.textContent = GLYPH[t];
+    btn.onclick = () => { wrap.style.display = 'none'; cb(t); };
+    opts.appendChild(btn);
+  });
+}
+
+function finishMove(from, to, promo){
+  const b = local.board;
+  const next = local.turn === 'w' ? 'b' : 'w';
+  const nb = applyMove(b, from, to, promo, local.ep);
+  const moves = (chess.moves || []).concat([{from, to, promo: promo || null, san: ''}]);
+  const after = deriveState(moves);
+  const san = toSAN(b, from, to, promo, local.rights, local.ep, nb, next);
+
+  let result = null, reason = null;
+  if(allLegal(after.board, next, after.rights, after.ep).length === 0){
+    if(inCheck(after.board, next)){ result = next === 'w' ? '0-1' : '1-0'; reason = 'Checkmate'; }
+    else { result = '1/2-1/2'; reason = 'Stalemate'; }
+  } else if(insufficient(after.board)){
+    result = '1/2-1/2'; reason = 'Insufficient material';
+  } else if(after.repCount >= 3){
+    result = '1/2-1/2'; reason = 'Threefold repetition';
+  } else if(after.half >= 100){
+    result = '1/2-1/2'; reason = '50-move rule';
+  }
+
+  sel = null; selMoves = []; dragFrom = null;
+  sendWS({type:'chess_move', from, to, promo: promo || null, board: nb, turn: next, san, result, reason});
+}
+
+/* K vs K, K+B vs K, K+N vs K, K+B vs K+B (same colour) */
+function insufficient(b){
+  const list = [];
+  for(let r = 0; r < 8; r++) for(let c = 0; c < 8; c++){
+    const p = b[r][c];
+    if(p && p.toLowerCase() !== 'k') list.push({t: p.toLowerCase(), col: (r + c) % 2, w: isW(p)});
+  }
+  if(list.length === 0) return true;
+  if(list.length === 1 && (list[0].t === 'b' || list[0].t === 'n')) return true;
+  if(list.length === 2 && list.every(x => x.t === 'b') && list[0].col === list[1].col && list[0].w !== list[1].w) return true;
+  return false;
+}
+
+window.addEventListener('load', () => { $('nameInput').focus(); });
+
+</script>
+</body>
+</html>
